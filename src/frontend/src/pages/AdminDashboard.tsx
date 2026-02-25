@@ -131,45 +131,40 @@ export function AdminDashboard() {
     if (!actor) return;
 
     try {
-      // Check if already admin
+      // Step 1: Check if already admin
       const currentAdminStatus = await actor.isCallerAdmin();
       if (currentAdminStatus) {
         setIsAdmin(true);
         toast.success('Admin access verified');
+        console.log('✓ Already an admin');
         return;
       }
 
-      // Try to initialize system (first caller becomes admin)
-      try {
-        await actor.initializeSystem();
-      } catch (initError: any) {
-        // System might already be initialized, that's okay
-        if (!initError.message?.includes('already initialized')) {
-          throw initError;
-        }
-      }
+      // Step 2: Bootstrap admin authorization with correct password (grants admin to first caller)
+      console.log('Attempting to initialize admin access...');
+      await actor.initializeAccessControlWithSecret(adminPassword);
+      console.log('✓ Admin authorization initialized');
+
+      // Step 3: Initialize system data
+      console.log('Attempting to initialize system data...');
+      await actor.initializeSystem();
+      console.log('✓ System data initialized');
       
-      // Try to assign admin role
-      try {
-        await actor.assignCallerUserRole(identity.getPrincipal(), UserRole.admin);
-      } catch (assignError: any) {
-        // Role might already be assigned
-        console.log('Could not assign role, checking status...', assignError);
-      }
-      
-      // Verify final admin status
+      // Step 4: Verify admin status
       const finalAdminStatus = await actor.isCallerAdmin();
+      console.log('Final admin status:', finalAdminStatus);
       
       if (finalAdminStatus) {
         setIsAdmin(true);
-        toast.success('Admin access granted');
+        toast.success('Admin access granted successfully');
       } else {
-        toast.error('Failed to grant admin access - you may not be the first user');
+        console.error('Admin verification failed after initialization');
+        toast.error('Failed to verify admin access. Please ensure you are the first user with the correct password.');
       }
     } catch (error) {
       console.error('Error during admin login:', error);
       const errorMessage = (error as Error).message || 'Unknown error';
-      toast.error('Admin login failed: ' + errorMessage);
+      toast.error(`Admin login failed: ${errorMessage}`);
     }
   };
 

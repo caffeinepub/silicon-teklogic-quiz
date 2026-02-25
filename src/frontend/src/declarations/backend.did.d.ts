@@ -72,6 +72,7 @@ export interface _SERVICE {
     }
   >,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'initializeSystem' : ActorMethod<[], undefined>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'isEmailWhitelisted' : ActorMethod<[string], boolean>,

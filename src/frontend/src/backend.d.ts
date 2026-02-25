@@ -69,6 +69,7 @@ export interface backendInterface {
         questions: Array<Question>;
     }>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
+    initializeAccessControlWithSecret(isAdminPassword: string): Promise<void>;
     initializeSystem(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
     isEmailWhitelisted(email: string): Promise<boolean>;
