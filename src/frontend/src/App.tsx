@@ -1,5 +1,6 @@
 import { createRouter, createRoute, createRootRoute, RouterProvider, Outlet } from '@tanstack/react-router';
 import { Toaster } from '@/components/ui/sonner';
+import { LandingPage } from './pages/LandingPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { RegisterPage } from './pages/RegisterPage';
 import { QuizPage } from './pages/QuizPage';
@@ -17,7 +18,7 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: () => <AdminDashboard />
+  component: () => <LandingPage />
 });
 
 const adminRoute = createRoute({

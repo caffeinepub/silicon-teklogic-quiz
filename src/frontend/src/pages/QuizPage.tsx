@@ -159,7 +159,7 @@ export function QuizPage() {
 
   if (isLoading || !currentQuestion) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-blue-50">
         <Header />
         <main className="container mx-auto px-4 py-8">
           <div className="text-center">
@@ -174,7 +174,7 @@ export function QuizPage() {
   const unattemptedCount = questions.length - attemptedCount;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-blue-50">
       <Header />
       
       <main className="container mx-auto px-4 py-6">

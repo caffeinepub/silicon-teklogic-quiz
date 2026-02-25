@@ -52,6 +52,7 @@ export interface backendInterface {
     addWhitelistedEmail(email: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     deleteQuestion(id: bigint): Promise<void>;
+    getAdminPrincipal(): Promise<Principal | null>;
     getAllParticipants(): Promise<Array<Participant>>;
     getAllQuestions(): Promise<Array<Question>>;
     getAllWhitelistedEmails(): Promise<Array<string>>;
@@ -69,12 +70,13 @@ export interface backendInterface {
         questions: Array<Question>;
     }>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
-    initializeAccessControlWithSecret(isAdminPassword: string): Promise<void>;
+    initializeAccessControlWithSecret(password: string): Promise<void>;
     initializeSystem(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
     isEmailWhitelisted(email: string): Promise<boolean>;
     registerParticipant(participant: Participant): Promise<void>;
     removeWhitelistedEmail(email: string): Promise<void>;
+    resetAdmin(resetPassword: string): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     submitQuiz(registrationNumber: string, answers: Array<Answer>, score: bigint): Promise<void>;
     updateQuestion(id: bigint, updatedQuestion: Question): Promise<void>;
