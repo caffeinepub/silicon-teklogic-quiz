@@ -10,8 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -19,8 +18,7 @@ import { Header } from '@/components/Header';
 import { exportToExcel, type ExportRow } from '@/utils/excelExport';
 import type { Question, Participant, Submission } from '../backend';
 import { QuestionType, UserRole } from '../backend';
-import { Edit, Trash2, Plus, Download, Search, Trophy, Users, FileQuestion, Mail, Eye, Loader2, AlertTriangle, ChevronDown } from 'lucide-react';
-import type { Principal } from '@icp-sdk/core/principal';
+import { Edit, Trash2, Plus, Download, Search, Trophy, Users, FileQuestion, Mail, Eye, Loader2 } from 'lucide-react';
 
 export function AdminDashboard() {
   const { identity, login, loginStatus } = useInternetIdentity();
@@ -30,11 +28,6 @@ export function AdminDashboard() {
   const [adminPassword, setAdminPassword] = useState('');
   const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  
-  // Admin recovery state
-  const [resetPassword, setResetPassword] = useState('');
-  const [showResetSection, setShowResetSection] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
 
   // Questions state
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -125,212 +118,60 @@ export function AdminDashboard() {
     setFilteredQuestions(filtered);
   }, [questions, roundFilter, subjectFilter]);
 
-  // Helper function to format Principal IDs
-  const formatPrincipal = (principal: Principal | string) => {
-    const str = typeof principal === 'string' ? principal : principal.toText();
-    if (str.length > 20) {
-      return `${str.slice(0, 8)}...${str.slice(-6)}`;
-    }
-    return str;
-  };
-
   const handleAdminLogin = async () => {
-    // Step 1: Verify user is logged in with Internet Identity
     if (!identity) {
       toast.error('Please login with Internet Identity first');
       login();
       return;
     }
-
-    // Step 2: Verify password is correct
-    if (adminPassword !== 'admin123') {
-      toast.error('Incorrect password');
+    
+    if (!adminPassword) {
+      toast.error('Please enter admin password');
       return;
     }
-
+    
     if (!actor) {
-      toast.error('Actor not initialized. Please wait and try again.');
+      toast.error('Connection not ready. Please wait...');
       return;
     }
-
+    
     setIsLoggingIn(true);
-
+    
     try {
-      // Step 3: Check if user is ALREADY admin
-      toast.loading('Checking admin status...');
-      const currentAdminStatus = await actor.isCallerAdmin();
-      if (currentAdminStatus) {
+      // Check if already admin
+      const isAdmin = await actor.isCallerAdmin();
+      if (isAdmin) {
         setIsAdmin(true);
-        toast.dismiss();
-        toast.success('✓ Admin access verified');
+        toast.success('Admin access verified');
+        setIsLoggingIn(false);
         return;
       }
-
-      // Step 4: Try to become admin by initializing access control
-      // This will only succeed if no admin has been assigned yet
-      toast.dismiss();
-      toast.loading('Initializing admin access...');
       
-      try {
-        await actor.initializeAccessControlWithSecret(adminPassword);
-      } catch (initError) {
-        // Initialization might fail silently if admin already exists
-        console.log('Access control initialization attempted:', initError);
-      }
-
-      // Step 5: Initialize system (required for quiz functionality)
-      toast.dismiss();
-      toast.loading('Setting up quiz system...');
+      // Try to claim admin access with password
+      await actor.initializeAccessControlWithSecret(adminPassword);
       
-      try {
-        await actor.initializeSystem();
-      } catch (systemError) {
-        const errorMsg = (systemError as Error).message || '';
-        
-        // If system is already initialized, that's okay - continue
-        if (!errorMsg.includes('already initialized')) {
-          // But if it's an authorization error, we're not admin
-          if (errorMsg.includes('Unauthorized') || errorMsg.includes('Only admins')) {
-            toast.dismiss();
-            
-            // Try to get the current admin's Principal
-            try {
-              const adminPrincipal = await actor.getAdminPrincipal();
-              const callerPrincipal = identity?.getPrincipal ? identity.getPrincipal() : null;
-              
-              if (adminPrincipal && callerPrincipal) {
-                toast.error('Admin Already Assigned', {
-                  description: (
-                    <div className="space-y-1 text-xs">
-                      <p><strong>Current Admin:</strong> {formatPrincipal(adminPrincipal)}</p>
-                      <p><strong>Your Principal:</strong> {formatPrincipal(callerPrincipal)}</p>
-                      <p className="pt-2 text-muted-foreground">If this is you from a different session, use that browser. Otherwise, use the Reset Admin Access option below.</p>
-                    </div>
-                  ),
-                  duration: 10000
-                });
-              } else {
-                toast.error('Admin Already Assigned', {
-                  description: 'The admin role has been assigned to another user. Only that user can access the admin dashboard.'
-                });
-              }
-            } catch (getPrincipalError) {
-              console.error('Error getting admin principal:', getPrincipalError);
-              toast.error('Admin Already Assigned', {
-                description: 'The admin role has been assigned to another user. Only that user can access the admin dashboard. Use Reset Admin Access if needed.'
-              });
-            }
-            
-            setIsLoggingIn(false);
-            return;
-          }
-          // Re-throw other unexpected errors
-          throw systemError;
-        }
-      }
-      
-      // Step 6: Verify we successfully became admin
-      toast.dismiss();
-      toast.loading('Verifying access...');
-      const finalAdminStatus = await actor.isCallerAdmin();
-      
-      toast.dismiss();
-      if (finalAdminStatus) {
+      // Verify admin status after initialization
+      const isNowAdmin = await actor.isCallerAdmin();
+      if (isNowAdmin) {
         setIsAdmin(true);
-        toast.success('✓ Admin access granted successfully!');
+        toast.success('Admin access granted successfully!');
       } else {
-        toast.error('Failed to Grant Admin Access', {
-          description: 'The admin role has already been assigned to the first user who logged in with the correct password. You can only view this portal as a regular user.'
-        });
+        toast.error('Failed to grant admin access. Another user may have already claimed the admin role.');
       }
-    } catch (error) {
-      console.error('Error during admin login:', error);
-      const errorMessage = (error as Error).message || 'Unknown error';
-      toast.dismiss();
       
-      // Provide specific error messages based on error type
-      if (errorMessage.includes('Unauthorized') || errorMessage.includes('Only admins')) {
-        // Try to get the current admin's Principal
-        try {
-          const adminPrincipal = await actor.getAdminPrincipal();
-          const callerPrincipal = identity?.getPrincipal ? identity.getPrincipal() : null;
-          
-          if (adminPrincipal && callerPrincipal) {
-            toast.error('Admin Already Assigned', {
-              description: (
-                <div className="space-y-1 text-xs">
-                  <p><strong>Current Admin:</strong> {formatPrincipal(adminPrincipal)}</p>
-                  <p><strong>Your Principal:</strong> {formatPrincipal(callerPrincipal)}</p>
-                  <p className="pt-2 text-muted-foreground">If this is you from a different session, use that browser. Otherwise, use the Reset Admin Access option below.</p>
-                </div>
-              ),
-              duration: 10000
-            });
-          } else {
-            toast.error('Admin Already Assigned', {
-              description: 'Another user has already been assigned the admin role. Only the first person to log in with the correct password becomes admin.'
-            });
-          }
-        } catch (getPrincipalError) {
-          console.error('Error getting admin principal:', getPrincipalError);
-          toast.error('Admin Already Assigned', {
-            description: 'Another user has already been assigned the admin role. Use Reset Admin Access if needed.'
-          });
-        }
-      } else if (errorMessage.includes('already initialized')) {
-        toast.error('System Already Set Up', {
-          description: 'The quiz system has already been initialized by another admin. You cannot become an admin at this time.'
-        });
+    } catch (error) {
+      console.error('Admin login error:', error);
+      const errorMsg = (error as Error).message || '';
+      
+      if (errorMsg.includes('Invalid password') || errorMsg.includes('Incorrect password')) {
+        toast.error('Incorrect password. Please try again.');
+      } else if (errorMsg.includes('already assigned') || errorMsg.includes('already been granted')) {
+        toast.error('Admin role already assigned to another user. Only the first user with the correct password can access the admin panel.');
       } else {
-        toast.error('Admin Login Failed', {
-          description: errorMessage || 'An unexpected error occurred. Please try again or contact support.'
-        });
+        toast.error('Login failed: ' + errorMsg);
       }
     } finally {
       setIsLoggingIn(false);
-    }
-  };
-
-  const handleResetAdmin = async () => {
-    if (!actor) {
-      toast.error('Actor not initialized. Please wait and try again.');
-      return;
-    }
-
-    if (!resetPassword.trim()) {
-      toast.error('Please enter the reset password');
-      return;
-    }
-
-    setIsResetting(true);
-
-    try {
-      await actor.resetAdmin(resetPassword);
-      
-      toast.success('Admin access reset successfully', {
-        description: 'You can now log in with password "admin123" to become admin'
-      });
-      
-      // Clear form fields
-      setAdminPassword('');
-      setResetPassword('');
-      setShowResetSection(false);
-      
-    } catch (error) {
-      console.error('Error resetting admin:', error);
-      const errorMessage = (error as Error).message || 'Unknown error';
-      
-      if (errorMessage.includes('Invalid reset password')) {
-        toast.error('Invalid Reset Password', {
-          description: 'The reset password you entered is incorrect. Contact support for the reset password.'
-        });
-      } else {
-        toast.error('Reset Failed', {
-          description: errorMessage || 'Failed to reset admin access. Please try again.'
-        });
-      }
-    } finally {
-      setIsResetting(false);
     }
   };
 
@@ -519,9 +360,6 @@ export function AdminDashboard() {
                       )}
                       {loginStatus === 'logging-in' ? 'Logging in...' : 'Login with Internet Identity'}
                     </Button>
-                    <p className="text-xs text-center text-muted-foreground">
-                      Step 1 of 2: Authenticate your identity
-                    </p>
                   </>
                 )}
                 
@@ -538,87 +376,7 @@ export function AdminDashboard() {
                         onKeyDown={(e) => e.key === 'Enter' && !isLoggingIn && handleAdminLogin()}
                         disabled={isLoggingIn}
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Default password: <code className="bg-muted px-1 py-0.5 rounded">admin123</code>
-                      </p>
                     </div>
-
-                    {/* Admin Reset Section */}
-                    <Collapsible open={showResetSection} onOpenChange={setShowResetSection}>
-                      <CollapsibleTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          className="w-full justify-between border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:text-amber-900"
-                          type="button"
-                        >
-                          <div className="flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4" />
-                            <span>Reset Admin Access (Recovery)</span>
-                          </div>
-                          <ChevronDown className={`h-4 w-4 transition-transform ${showResetSection ? 'rotate-180' : ''}`} />
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="mt-3 space-y-3">
-                        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2">
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
-                            <div className="space-y-1 text-sm text-amber-900">
-                              <p className="font-semibold">⚠️ Warning</p>
-                              <ul className="list-disc list-inside space-y-1 text-xs">
-                                <li>This will clear admin role assignments</li>
-                                <li>All quiz data will be preserved (questions, participants, scores)</li>
-                                <li>After reset, first person with password 'admin123' becomes admin</li>
-                              </ul>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="resetPassword">Reset Password</Label>
-                          <Input
-                            id="resetPassword"
-                            type="password"
-                            value={resetPassword}
-                            onChange={(e) => setResetPassword(e.target.value)}
-                            placeholder="Enter reset password"
-                            disabled={isResetting}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Contact support for reset password if needed
-                          </p>
-                        </div>
-
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button 
-                              variant="destructive" 
-                              className="w-full" 
-                              disabled={isResetting || !resetPassword.trim()}
-                            >
-                              {isResetting && (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              )}
-                              {isResetting ? 'Resetting...' : 'Reset Admin Access'}
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will clear admin role assignments but preserve all quiz data (questions, participants, and scores). 
-                                After reset, the first person to log in with password 'admin123' will become the new admin.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={handleResetAdmin} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                Reset Admin Access
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </CollapsibleContent>
-                    </Collapsible>
 
                     <Button 
                       onClick={handleAdminLogin} 
@@ -630,9 +388,6 @@ export function AdminDashboard() {
                       )}
                       {isLoggingIn ? 'Accessing...' : 'Access Admin Dashboard'}
                     </Button>
-                    <p className="text-xs text-center text-muted-foreground">
-                      Step 2 of 2: Verify admin access
-                    </p>
                   </>
                 )}
               </CardContent>
